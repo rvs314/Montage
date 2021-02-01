@@ -170,13 +170,10 @@ public:
     int8_t slot_idx;
     bool expanded;
     uint64_t capacity;
-    mapped_type found_value;
 
     ret(size_type _level_idx, difference_type _bucket_idx, size_type _slot_idx,
-	mapped_type fv,
         bool _expanded = false, uint64_t _cap = 0)
         : found(true), level_idx(_level_idx), bucket_idx(_bucket_idx),
-	  found_value(fv),
           slot_idx(_slot_idx), expanded(_expanded), capacity(_cap) {}
 
     ret(bool _expanded, uint64_t _cap)
@@ -496,7 +493,7 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::search(
             f_b.slots[j].p.get_offset() != 0) {
 	  value_type *maybe_it = f_b.slots[j].p.get_address(my_pool_uuid);
           if (key_equal{}(maybe_it->first, key)) {
-            return ret(i, f_idx, j, maybe_it->second);
+            return ret(i, f_idx, j);
           }
         }
       }
@@ -508,7 +505,7 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::search(
 	  value_type *maybe_it = s_b.slots[j].p.get_address(my_pool_uuid);
           if (key_equal{}(maybe_it->first,
                           key)) {
-            return ret(i, s_idx, j, maybe_it->second);
+            return ret(i, s_idx, j);
           }
         }
       }
@@ -1403,6 +1400,9 @@ class CLevelHashAdapter : public RMap<K, V> {
     return fs::temp_directory_path() / fs::path("tmp");
   }
 
+  // The hash itself
+  pmem::obj::persistent_ptr<map> hash;
+
 public:
   CLevelHashAdapter(GlobalTestConfig *gtc) {
     // Clean out the pool if another is there
@@ -1428,18 +1428,26 @@ public:
 
     // Finish the transaction
     nvobj::transaction::commit();
+
+    // Assign hash to the allocated root
+    hash = proot->cons;
   }
 
   // Gets value corresponding to a key
   // returns : the most recent value set for that key
   optional<V> get(K key, int tid) {
+    auto ret = hash->search(key);
+
     return optional<V>{};
   }
   
   // Puts a new key/value pair into the map   
-     // returns : the previous value for this key,
+  // returns : the previous value for this key,
   // or NULL if no such value exists
   optional<V> put(K key, V val, int tid) {
+    std::pair<K, V> par{key, val};
+    auto ret = hash->insert(par, tid, 0); // The last item doesn't make sense?
+
     return optional<V>{};
   }
   
@@ -1447,12 +1455,19 @@ public:
   // if the key is not already present
   // returns : true if the insert is successful, false otherwise
   bool insert(K key, V val, int tid) {
-    return false;
+    std::pair<K, V> par{key, val};
+    auto ret = hash->insert(par, tid, 0); // The last item doesn't make sense?
+    // Because of the way CLevel is designed,
+    // we can't know whether or not the item is actually in
+    // the table because it may be shadowed by a concurrent insert
+    return true;
   }
  
   // Removes a value corresponding to a key
   // returns : the removed value
   optional<V> remove(K key, int tid) {
+    auto ret = hash->erase(key, tid);
+
     return optional<V>{};
   }
   
@@ -1460,6 +1475,8 @@ public:
   // if the key is already present in the map
   // returns : the replaced value, or NULL if replace was unsuccessful
   optional<V> replace(K key, V val, int tid) {
+    std::pair<K, V> par{key, val};
+    auto ret = hash->update(par, tid);
     return optional<V>{};
   };
 
