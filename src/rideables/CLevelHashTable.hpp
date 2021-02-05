@@ -4,11 +4,16 @@
 #include "RMap.hpp"
 #include "AllocatorMacro.hpp"
 #include "libpmemobj++/experimental/clevel_hash.hpp"
+#include <filesystem>
+#include <unistd.h>
+#include <iostream>
 
 #define LAYOUT "clevel_hash"
 using namespace pmem;
 using namespace pmem::obj;
 using namespace pmem::obj::experimental;
+
+namespace fs = std::filesystem;
 
 template<typename K, typename V>
 class CLevelHashAdapter : public RMap<K, V> {
@@ -20,15 +25,18 @@ class CLevelHashAdapter : public RMap<K, V> {
   pmem::obj::pool<Root> pool;
   pmem::obj::persistent_ptr<clevel_map> hash;
 
+  fs::path temp_path() {
+    return fs::path("/mnt/pmem") / fs::path(getlogin());
+  }
+  
 public:
   CLevelHashAdapter(GlobalTestConfig *gtc) {
-    char* heap_prefix = (char*) malloc(L_cuserid+11);
-    strcpy(heap_prefix,"/mnt/pmem/");
-    cuserid(heap_prefix+strlen("/mnt/pmem/"));
+    if (fs::exists(temp_path()))
+      fs::remove(temp_path());
 
     // Allocate the initial pool
-    pool = pmem::obj::pool<Root>::create(heap_prefix, LAYOUT, REGION_SIZE, /* TODO: allocate more space if needed*/ S_IWUSR | S_IRUSR);
-    free(heap_prefix);
+    pool = pmem::obj::pool<Root>::create(temp_path(), LAYOUT, REGION_SIZE, /* TODO: allocate more space if needed*/ S_IWUSR | S_IRUSR);
+
     // Pop off the root object from the pool
     auto proot = pool.root();
     // Start a transaction to init the pool information
@@ -53,7 +61,9 @@ public:
   // returns : the previous value for this key,
   // or NULL if no such value exists
   optional<V> put(K key, V val, int tid) {
-    /* To-do */
+    std::pair<K, V> par{key, val};
+    auto ret = hash->update(par, tid);
+    
     return optional<V>{};
   }
   
@@ -88,6 +98,9 @@ public:
   };
 
   ~CLevelHashAdapter() {
+    std::cout << "Removing: " << temp_path() << std::endl;
+    fs::remove(temp_path());
+      
     // close the pool
     pool.close();
   }
