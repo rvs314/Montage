@@ -54,7 +54,7 @@ public:
         }
     }__attribute__((aligned(CACHELINE_SIZE)));
     struct Bucket{
-        mutex lock;
+        std::mutex lock;
         ListNode head;
         Bucket():head(){};
     }__attribute__((aligned(CACHELINE_SIZE)));

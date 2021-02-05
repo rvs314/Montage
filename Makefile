@@ -59,6 +59,7 @@
 # -------------------------
 NVM_MALLOC_DIR=./ext/mod-single-repo/nvm_malloc/
 IMMER_DIR=./ext/mod-single-repo/Immutable-Datastructure-c++/
+CLELVEL_DIR=./ext/Clevel-Hashing/include/libpmemobj++/experimental
 PRONTO_PATH = ./ext/pronto-v1.1
 MNEMOSYNE_PATH = ./ext/mnemosyne-gcc
 LIBITM_PATH = ./ext/libitm

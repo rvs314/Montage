@@ -278,13 +278,12 @@ public:
 	clevel_hash() : meta(make_persistent<level_meta>().raw().off),
 		thread_num(0)
 	{
-		std::cout << "clevel_hash constructor: HashPower = "
-			<< HashPower << std::endl;
+		//std::cout << "clevel_hash constructor: HashPower = " << HashPower << std::endl;
 
 		assert(HashPower > 0);
 		hashpower.get_rw() = HashPower;
 
-		std::cout << "hashpower : " << hashpower << std::endl;
+		//std::cout << "hashpower : " << hashpower << std::endl;
 
 		// setup pool
 		PMEMoid oid = pmemobj_oid(this);
@@ -294,8 +293,8 @@ public:
 		level_meta *m = static_cast<level_meta *>(meta(my_pool_uuid));
 
 		persistent_ptr<level_bucket> tmp = make_persistent<level_bucket>();
-		tmp->buckets = make_persistent<bucket[]>(pow(2, hashpower));
-		tmp->capacity = pow(2, hashpower);
+		tmp->buckets = make_persistent<bucket[]>(pow(2, HashPower));
+		tmp->capacity = pow(2, HashPower);
 		tmp->up = nullptr;
 		m->first_level.off = tmp.raw().off;
 
@@ -1303,8 +1302,7 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::expand(
 	{
 		make_persistent_atomic<level_bucket>(pop, tmp_level[t_id]);
 		size_type new_capacity = cl->capacity * 2;
-		std::cout << "Thread-" << thread_id << " starts expanding for "
-			<< new_capacity << " buckets" << std::endl;
+		//std::cout << "Thread-" << thread_id << " starts expanding for " << new_capacity << " buckets" << std::endl;
 
 		make_persistent_atomic<bucket[]>(
 			pop, tmp_level[t_id]->buckets, new_capacity);
@@ -1351,9 +1349,7 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::expand(
 			{
 				pop.persist(&(meta.off), sizeof(uint64_t));
 
-				std::cout << "Thread-" << thread_id
-					<< " finishes expanding, capacity: "
-					<< capacity() << std::endl;
+				//std::cout << "Thread-" << thread_id << " finishes expanding, capacity: " << capacity() << std::endl;
 				break;
 			}
 			else
@@ -1400,10 +1396,7 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::expand(
 				if (CAS(&(meta.off), m_copy.off, tmp_meta[t_id].raw().off))
 				{
 					pop.persist(&(meta.off), sizeof(uint64_t));
-
-					std::cout << "Thread-" << thread_id
-						<< " finishes expanding, capacity: "
-						<< capacity() << std::endl;
+					//std::cout << "Thread-" << thread_id << " finishes expanding, capacity: " << capacity() << std::endl;
 					break;
 				}
 				else
@@ -1524,7 +1517,7 @@ RETRY_REHASH:
 
 				if (!succ)
 				{
-					std::cout << "expand during resizing!" << std::endl;
+					//std::cout << "expand during resizing!" << std::endl;
 					expand(pop, thread_id, m_copy);
 					goto RETRY_REHASH;
 				}
@@ -1549,10 +1542,7 @@ RETRY_REHASH:
 
 					if (CAS(&(meta.off), m_copy.off, tmp_meta[t_id].raw().off))
 					{
-						std::cout << "Expand thread updates metadata, "
-							<< "is_resizing: " << bool(levels_left != 2)
-							<<  " levels_left: " << levels_left
-							<< std::endl;
+						//std::cout << "Expand thread updates metadata, " << "is_resizing: " << bool(levels_left != 2) <<  " levels_left: " << levels_left << std::endl;
 						pop.persist(&(meta.off), sizeof(uint64_t));
 
 						expand_bucket.get_rw() = 0;
@@ -1576,7 +1566,7 @@ RETRY_REHASH:
 		} // end for (ii)
 	} // end while(run_expand_thread)
 
-	std::cout << "expand_thread exits" << std::endl;
+	//std::cout << "expand_thread exits" << std::endl;
 }
 
 template <typename Key, typename T, typename Hash, typename KeyEqual,
@@ -1603,7 +1593,7 @@ template <typename Key, typename T, typename Hash, typename KeyEqual,
 void
 clevel_hash<Key, T, Hash, KeyEqual, HashPower>::clear()
 {
-	std::cout << "level destroy!" << std::endl;
+	//std::cout << "level destroy!" << std::endl;
 }
 
 } /* namespace experimental */
