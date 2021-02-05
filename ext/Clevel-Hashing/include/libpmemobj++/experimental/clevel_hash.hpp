@@ -43,6 +43,8 @@
 #include <fstream>
 #include <immintrin.h>
 
+#include "RCUTracker.hpp"
+
 #if _MSC_VER
 #include <intrin.h>
 #include <windows.h>
@@ -110,12 +112,13 @@ public:
 	struct level_bucket;
 	struct level_meta;
 
-
 	using KV_entry_ptr_t = detail::compound_pool_ptr<value_type>;
 
 	using level_ptr_t = detail::compound_pool_ptr<level_bucket>;
 
 	using level_meta_ptr_t = detail::compound_pool_ptr<level_meta>;
+
+	//RCUTracker<value_type> tracker;
 
 #if LIBPMEMOBJ_CPP_USE_TBB_RW_MUTEX
 	using mutex_t = pmem::obj::experimental::v<tbb::spin_rw_mutex>;
@@ -177,15 +180,16 @@ public:
 	struct ret
 	{
 		bool found;
+		mapped_type val;
 		uint8_t level_idx;
 		difference_type bucket_idx;
 		int8_t slot_idx;
 		bool expanded;
 		uint64_t capacity;
 
-		ret(size_type _level_idx, difference_type _bucket_idx,
+		ret(mapped_type _val, size_type _level_idx, difference_type _bucket_idx,
 			size_type _slot_idx, bool _expanded=false, uint64_t _cap = 0)
-		    : found(true), level_idx(_level_idx), bucket_idx(_bucket_idx),
+		    :val(_val), found(true), level_idx(_level_idx), bucket_idx(_bucket_idx),
 			slot_idx(_slot_idx), expanded(_expanded), capacity(_cap)
 		{
 		}
@@ -196,6 +200,17 @@ public:
 		{
 		}
 
+
+		ret(bool _found, mapped_type _val) : found(_found), val(_val), level_idx(0), bucket_idx(0),
+			slot_idx(0), expanded(false), capacity(0)
+		{
+		}
+
+		ret(mapped_type _val) : found(true), val(_val), level_idx(0), bucket_idx(0),
+			slot_idx(0), expanded(false), capacity(0)
+		{
+		}
+		
 		ret(bool _found) : found(_found), level_idx(0), bucket_idx(0),
 			slot_idx(0), expanded(false), capacity(0)
 		{
@@ -316,6 +331,8 @@ public:
 			// never fires.
 			get_key(e);
 		}
+
+		//tracker()
 	}
 
 	static void
@@ -575,7 +592,9 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::search(
 					if (key_equal{}(
 						f_b.slots[j].p.get_address(my_pool_uuid)->first, key))
 					{
-						return ret(i, f_idx, j);
+						mapped_type val = f_b.slots[j].p.get_address(my_pool_uuid)->second;
+						//return ret(i, f_idx, j);
+						return ret(true, val);
 					}
 				}
 			}
@@ -589,7 +608,9 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::search(
 					if (key_equal{}(
 						s_b.slots[j].p.get_address(my_pool_uuid)->first, key))
 					{
-						return ret(i, s_idx, j);
+						mapped_type val = s_b.slots[j].p.get_address(my_pool_uuid)->second;
+						//return ret(i, s_idx, j);
+						return ret(true, val);
 					}
 				}
 			}
@@ -1053,7 +1074,12 @@ RETRY_INSERT:
 		if (result == FOUND_IN_LEFT || result == FOUND_IN_RIGHT)
 		{
 			delete_persistent_atomic<value_type>(tmp_entry[t_id]);
-			return ret(level_num, 0, 0);
+			//return ret(level_num, 0, 0);
+			if(check_duplicate){ // check_duplicate is set to false only when new KV is successfully persisted
+				return ret();
+			}else{
+				return ret(true);
+			}
 		}
 		else if ((result == VACANCY_IN_LEFT || result == VACANCY_IN_RIGHT) &&
 			(level_num > 0 || !m->is_resizing))
@@ -1106,6 +1132,7 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::erase(
 	partial_t partial = get_partial(hv);
 	difference_type expand_bucket_old;
 	bool succ_deletion = false;
+	mapped_type val;
 
 	while(true)
 	{
@@ -1132,6 +1159,7 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::erase(
 					if (key_equal{}(
 						tmp.p.get_address(my_pool_uuid)->first, key))
 					{
+						val = tmp.p.get_address(my_pool_uuid)->second;
 						if (CAS(&(f_b.slots[j].p.off), tmp.p.off, 0))
 						{
 							pop.persist(&(f_b.slots[j].p.off), sizeof(uint64_t));
@@ -1172,6 +1200,7 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::erase(
 					if (key_equal{}(
 						tmp.p.get_address(my_pool_uuid)->first, key))
 					{
+						val = tmp.p.get_address(my_pool_uuid)->second;
 						if (CAS(&(s_b.slots[j].p.off), tmp.p.off, 0))
 						{
 							pop.persist(&(s_b.slots[j].p.off), sizeof(uint64_t));
@@ -1206,8 +1235,14 @@ clevel_hash<Key, T, Hash, KeyEqual, HashPower>::erase(
 		}while(li != m->first_level);
 
 		// Context checking.
-		if (m_copy == meta)
-			return ret(succ_deletion);
+		if (m_copy == meta){
+			if(succ_deletion){
+				return ret(true, val);
+			}else{
+				return ret();
+			}
+		}
+		// return ret(succ_deletion);
 	} // end while(true)
 
 }
