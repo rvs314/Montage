@@ -245,13 +245,12 @@ public:
   clevel_hash(GlobalTestConfig *gtc): clevel_hash(gtc->task_num) {}
 
   clevel_hash(size_t tid = 0) : meta(make_persistent<level_meta>().raw().off), thread_num(tid) {
-    std::cout << "clevel_hash constructor: HashPower = " << HashPower
-              << std::endl;
+    //std::cout << "clevel_hash constructor: HashPower = " << HashPower << std::endl;
 
     assert(HashPower > 0);
     hashpower.get_rw() = HashPower;
 
-    std::cout << "hashpower : " << hashpower << std::endl;
+    //std::cout << "hashpower : " << hashpower << std::endl;
 
     // setup pool
     PMEMoid oid = pmemobj_oid(this);
@@ -1121,8 +1120,8 @@ void clevel_hash<Key, T, Hash, KeyEqual, HashPower>::expand(
   if (cl->up == nullptr) {
     make_persistent_atomic<level_bucket>(pop, tmp_level[t_id]);
     size_type new_capacity = cl->capacity * 2;
-    std::cout << "Thread-" << thread_id << " starts expanding for "
-              << new_capacity << " buckets" << std::endl;
+    //std::cout << "Thread-" << thread_id << " starts expanding for "
+    //          << new_capacity << " buckets" << std::endl;
 
     make_persistent_atomic<bucket[]>(pop, tmp_level[t_id]->buckets,
                                      new_capacity);
@@ -1163,9 +1162,9 @@ void clevel_hash<Key, T, Hash, KeyEqual, HashPower>::expand(
       if (CAS(&(meta.off), m_copy.off, tmp_meta[t_id].raw().off)) {
         pop.persist(&(meta.off), sizeof(uint64_t));
 
-        std::cout << "Thread-" << thread_id
-                  << " finishes expanding, capacity: " << capacity()
-                  << std::endl;
+        //std::cout << "Thread-" << thread_id
+        //          << " finishes expanding, capacity: " << capacity()
+        //          << std::endl;
         break;
       } else {
         m_copy = level_meta_ptr_t(meta);
@@ -1324,9 +1323,9 @@ void clevel_hash<Key, T, Hash, KeyEqual, HashPower>::resize() {
               pop, tmp_meta[t_id], m->first_level, bl->up, levels_left != 2);
 
           if (CAS(&(meta.off), m_copy.off, tmp_meta[t_id].raw().off)) {
-            std::cout << "Expand thread updates metadata, "
-                      << "is_resizing: " << bool(levels_left != 2)
-                      << " levels_left: " << levels_left << std::endl;
+            // std::cout << "Expand thread updates metadata, "
+            //           << "is_resizing: " << bool(levels_left != 2)
+            //           << " levels_left: " << levels_left << std::endl;
             pop.persist(&(meta.off), sizeof(uint64_t));
 
             expand_bucket.get_rw() = 0;
@@ -1395,26 +1394,20 @@ class CLevelHashAdapter : public RMap<K, V> {
   // The pool, which will contain one root object
   pmem::obj::pool<Root> pool;
 
-  // The location of the temp file
-  static fs::path temp_path() {
-    return fs::temp_directory_path() / fs::path("tmp");
-  }
-
   // The hash itself
   pmem::obj::persistent_ptr<map> hash;
 
 public:
   CLevelHashAdapter(GlobalTestConfig *gtc) {
+    std::string ClevelPath = "/mnt/pmem/clevel";
     // Clean out the pool if another is there
-    if (fs::exists(temp_path()))
-      fs::remove(temp_path());
+    if (fs::exists(ClevelPath)){
+      fs::remove(ClevelPath);
+    }
 
     // Allocate the initial pool
-    pool = nvobj::pool<Root>
-      ::create(CLevelHashAdapter::temp_path().native(),
-	       LAYOUT,
-	       PMEMOBJ_MIN_POOL * 20, // TODO: allocate more space if needed
-	       S_IWUSR | S_IRUSR);
+    //pool = nvobj::pool<Root>::create(CLevelHashAdapter::temp_path().native(), LAYOUT, PMEMOBJ_MIN_POOL * 20, /* TODO: allocate more space if needed*/ S_IWUSR | S_IRUSR);
+    pool = nvobj::pool<Root>::create(ClevelPath, LAYOUT, PMEMOBJ_MIN_POOL * 20, /* TODO: allocate more space if needed*/ S_IWUSR | S_IRUSR);
 
     // Pop off the root object from the pool
     auto proot = pool.root();
@@ -1455,6 +1448,7 @@ public:
   // if the key is not already present
   // returns : true if the insert is successful, false otherwise
   bool insert(K key, V val, int tid) {
+    //cout << "here in insert" << endl;
     std::pair<K, V> par{key, val};
     auto ret = hash->insert(par, tid, 0); // The last item doesn't make sense?
     // Because of the way CLevel is designed,
@@ -1483,9 +1477,6 @@ public:
   ~CLevelHashAdapter() {
     // close the pool
     pool.close();
-
-    // Remove the temporary file
-    fs::remove(temp_path());
   }
 };
 
