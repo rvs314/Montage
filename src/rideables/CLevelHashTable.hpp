@@ -53,7 +53,9 @@ public:
   // returns : the most recent value set for that key
   optional<V> get(K key, int tid) {
     auto ret = hash->search(key);
-
+    if(ret.found){
+      return ret.val;
+    }
     return optional<V>{};
   }
   
@@ -67,9 +69,6 @@ public:
     return optional<V>{};
   }
   
-  // Inserts a new key/value pair into the map
-  // if the key is not already present
-  // returns : true if the insert is successful, false otherwise
   bool insert(K key, V val, int tid) {
     //cout << "here in insert" << endl;
     std::pair<K, V> par{key, val};
@@ -84,7 +83,9 @@ public:
   // returns : the removed value
   optional<V> remove(K key, int tid) {
     auto ret = hash->erase(key, tid);
-
+    if(ret.found){
+      return ret.val;
+    }
     return optional<V>{};
   }
   
