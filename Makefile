@@ -59,7 +59,7 @@
 # -------------------------
 NVM_MALLOC_DIR=./ext/mod-single-repo/nvm_malloc/
 IMMER_DIR=./ext/mod-single-repo/Immutable-Datastructure-c++/
-CLELVEL_DIR=./ext/Clevel-Hashing/include/libpmemobj++/experimental
+CLELVEL_DIR=./ext/Clevel-Hashing/include/
 PRONTO_PATH = ./ext/pronto-v1.1
 MNEMOSYNE_PATH = ./ext/mnemosyne-gcc
 LIBITM_PATH = ./ext/libitm
@@ -68,7 +68,7 @@ IDIRS:=./src ./src/utils ./src/rideables ./src/tests ./src/persist ./src/persist
 IDIRS+=./ext/ralloc/src
 IDIRS+=$(IMMER_DIR) $(NVM_MALLOC_DIR)/src/ 
 # IDIRS+=./ext/pmdk/src/include
-IDIRS+=./ext/Clevel-Hashing/include
+IDIRS+=$(CLELVEL_DIR)
 
 # directory to put build artifacts (e.g. .o, .d files)
 ODIR:=./obj

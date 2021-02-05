@@ -1,11 +1,9 @@
 #ifndef CLEVEL_HASH_HPP
 #define CLEVEL_HASH_HPP
 
-#include "libpmemobj++/experimental/clevel_hash.hpp"
 #include "RMap.hpp"
-#include <libpmemobj++/pool.hpp>
-#include <libpmemobj++/detail/common.hpp>
-#include <filesystem>
+#include "AllocatorMacro.hpp"
+#include "libpmemobj++/experimental/clevel_hash.hpp"
 
 #define LAYOUT "clevel_hash"
 using namespace pmem;
@@ -14,18 +12,12 @@ using namespace pmem::obj::experimental;
 
 template<typename K, typename V>
 class CLevelHashAdapter : public RMap<K, V> {
-
+  // init starts
   using clevel_map = pmem::obj::experimental::clevel_hash<K, V>;
-  
-  // Root allocation
   struct Root {
     pmem::obj::persistent_ptr<clevel_map> cons;
   };
-
-  // The pool, which will contain one root object
   pmem::obj::pool<Root> pool;
-
-  // The hash itself
   pmem::obj::persistent_ptr<clevel_map> hash;
 
 public:
@@ -33,25 +25,19 @@ public:
     char* heap_prefix = (char*) malloc(L_cuserid+11);
     strcpy(heap_prefix,"/mnt/pmem/");
     cuserid(heap_prefix+strlen("/mnt/pmem/"));
-    // Clean out the pool if another is there
-    if (std::filesystem::exists(heap_prefix)){
-      std::filesystem::remove(heap_prefix);
-    }
+
     // Allocate the initial pool
-    pool = pmem::obj::pool<Root>::create(heap_prefix, LAYOUT, PMEMOBJ_MIN_POOL * 20, /* TODO: allocate more space if needed*/ S_IWUSR | S_IRUSR);
+    pool = pmem::obj::pool<Root>::create(heap_prefix, LAYOUT, REGION_SIZE, /* TODO: allocate more space if needed*/ S_IWUSR | S_IRUSR);
     free(heap_prefix);
     // Pop off the root object from the pool
     auto proot = pool.root();
     // Start a transaction to init the pool information
     {
       pmem::obj::transaction::manual tx(pool);
-      // Allocate the map type, set the thread number
       proot->cons = pmem::obj::make_persistent<clevel_map>();
       proot->cons->set_thread_num(gtc->task_num);
-      
       pmem::obj::transaction::commit();
     }
-    // Assign hash to the allocated root
     hash = proot->cons;
   }
 
@@ -67,9 +53,7 @@ public:
   // returns : the previous value for this key,
   // or NULL if no such value exists
   optional<V> put(K key, V val, int tid) {
-    std::pair<K, V> par{key, val};
-    auto ret = hash->insert(par, tid, 0); // The last item doesn't make sense?
-
+    /* To-do */
     return optional<V>{};
   }
   
@@ -80,9 +64,9 @@ public:
     //cout << "here in insert" << endl;
     std::pair<K, V> par{key, val};
     auto ret = hash->insert(par, tid, 0); // The last item doesn't make sense?
-    // Because of the way CLevel is designed,
-    // we can't know whether or not the item is actually in
-    // the table because it may be shadowed by a concurrent insert
+    if(ret.found){
+      return false;
+    }
     return true;
   }
  
