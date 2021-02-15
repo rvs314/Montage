@@ -23,7 +23,7 @@
 #include "Queue.hpp"
 #include "MSQueue.hpp"
 #include "PriorityQueue.hpp"
-#include "clevel_hash.hpp"
+#include "CLevelHashTable.hpp"
 
 // #include "LinkedList.hpp"
 // #include "HOHHashTable.hpp"
